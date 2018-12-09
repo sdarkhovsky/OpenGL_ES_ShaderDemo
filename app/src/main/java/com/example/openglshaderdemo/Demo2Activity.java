@@ -1,18 +1,25 @@
 package com.example.openglshaderdemo;
 
 import android.content.Context;
-import android.opengl.GLES20;
+import android.opengl.GLES31;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
 
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
+import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGLConfig;
+import javax.microedition.khronos.egl.EGLContext;
+import javax.microedition.khronos.egl.EGLDisplay;
 import javax.microedition.khronos.opengles.GL10;
+
+import static android.content.ContentValues.TAG;
 
 public class Demo2Activity extends AppCompatActivity {
 
@@ -36,8 +43,9 @@ class Demo2SurfaceView extends GLSurfaceView {
     public Demo2SurfaceView(Context context){
         super(context);
 
-        // Create an OpenGL ES 2.0 context
-        setEGLContextClientVersion(2);
+        setEGLContextFactory(new ContextFactory());
+
+        setEGLContextClientVersion(3);
 
         mRenderer = new Demo2Renderer();
 
@@ -47,6 +55,32 @@ class Demo2SurfaceView extends GLSurfaceView {
         // Render the view only when there is a change in the drawing data
         setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
     }
+
+    private static double glVersion = 3.1;
+    private static class ContextFactory implements GLSurfaceView.EGLContextFactory {
+
+        private static int EGL_CONTEXT_CLIENT_VERSION = 0x3098;
+
+        public EGLContext createContext(
+                EGL10 egl, EGLDisplay display, EGLConfig eglConfig) {
+
+            Log.w(TAG, "creating OpenGL ES " + glVersion + " context");
+            int[] attrib_list = {EGL_CONTEXT_CLIENT_VERSION, (int) glVersion,
+                    EGL10.EGL_NONE };
+            // attempt to create a OpenGL ES 3.0 context
+            EGLContext context = egl.eglCreateContext(
+                    display, eglConfig, EGL10.EGL_NO_CONTEXT, attrib_list);
+            return context; // returns null if 3.0 is not supported;
+        }
+
+        public void destroyContext(EGL10 egl, EGLDisplay display, EGLContext context) {
+            if (!egl.eglDestroyContext(display, context)) {
+                Log.e("ContextFactory", "display:" + display + " context: " + context);
+                Log.i("ContextFactory", "tid=" + Thread.currentThread().getId());
+                throw new RuntimeException("eglDestroyContext failed: ");
+            }
+        }
+    }
 }
 
 class Demo2Renderer implements GLSurfaceView.Renderer {
@@ -55,7 +89,7 @@ class Demo2Renderer implements GLSurfaceView.Renderer {
 
     public void onDrawFrame(GL10 unused) {
         // Redraw background color
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+        GLES31.glClear(GLES31.GL_COLOR_BUFFER_BIT);
 
         mTriangle.draw();
     }
@@ -64,14 +98,14 @@ class Demo2Renderer implements GLSurfaceView.Renderer {
     // The android.opengl.EGLConfig import does not overwrite the super class abstract method
     public void onSurfaceCreated(GL10 unused, EGLConfig config) {
         // Set the background frame color
-        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        GLES31.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-        String renderer = GLES20.glGetString( GLES20.GL_RENDERER );
-        String vendor = GLES20.glGetString( GLES20.GL_VENDOR );
-        String version = GLES20.glGetString( GLES20.GL_VERSION );
+        String renderer = GLES31.glGetString( GLES31.GL_RENDERER );
+        String vendor = GLES31.glGetString( GLES31.GL_VENDOR );
+        String version = GLES31.glGetString( GLES31.GL_VERSION );
         String glslVersion =
-                GLES20.glGetString( GLES20.GL_SHADING_LANGUAGE_VERSION );
-        String extensions = GLES20.glGetString(GLES20.GL_EXTENSIONS);
+                GLES31.glGetString( GLES31.GL_SHADING_LANGUAGE_VERSION );
+        String extensions = GLES31.glGetString(GLES31.GL_EXTENSIONS);
 /*
         My Nexus 6 phone:
         renderer = "Adreno (TM) 420"
@@ -87,27 +121,25 @@ class Demo2Renderer implements GLSurfaceView.Renderer {
     }
 
     public void onSurfaceChanged(GL10 unused, int width, int height) {
-        GLES20.glViewport(0, 0, width, height);
+        GLES31.glViewport(0, 0, width, height);
     }
 
     public static int loadShader(int type, String shaderCode){
 
-        // create a vertex shader type (GLES20.GL_VERTEX_SHADER)
-        // or a fragment shader type (GLES20.GL_FRAGMENT_SHADER)
-        int shader = GLES20.glCreateShader(type);
+        int shader = GLES31.glCreateShader(type);
 
         // add the source code to the shader and compile it
-        GLES20.glShaderSource(shader, shaderCode);
-        GLES20.glCompileShader(shader);
+        GLES31.glShaderSource(shader, shaderCode);
+        GLES31.glCompileShader(shader);
 
         IntBuffer status = IntBuffer.allocate(1);
-        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, status);
-        if (status.get(0) == GLES20.GL_FALSE) {
+        GLES31.glGetShaderiv(shader, GLES31.GL_COMPILE_STATUS, status);
+        if (status.get(0) == GLES31.GL_FALSE) {
             IntBuffer logLen = IntBuffer.allocate(1);
-            GLES20.glGetShaderiv(shader, GLES20.GL_INFO_LOG_LENGTH, logLen);
+            GLES31.glGetShaderiv(shader, GLES31.GL_INFO_LOG_LENGTH, logLen);
 
             if (logLen.get(0) > 0) {
-                String log = GLES20.glGetShaderInfoLog(shader);
+                String log = GLES31.glGetShaderInfoLog(shader);
                 System.out.print(log);
             }
         }
@@ -122,103 +154,112 @@ class Demo2Triangle {
 
     private final int mProgram;
 
+    /*
+     For a version GLES3.0 it's mandatory to have #version directive ending with \n
+     and replace "attribute" qualifier with "in"
+     In addition, the program runs correctly on the device, but closes on the emulator
+    */
     private final String vertexShaderCode =
-            "attribute vec4 vPosition;" +
-                    "void main() {" +
-                    "  gl_Position = vPosition;" +
-                    "}";
+                "#version 300 es\n" +
+                "in vec3 VertexPosition;" +
+                "in vec3 VertexColor;" +
+                "out vec3 Color;" +
+                "void main() {" +
+                "  Color = VertexColor;" +
+                "  gl_Position = vec4(VertexPosition,1.0);" +
+                "}";
 
     private final String fragmentShaderCode =
-            "precision mediump float;" +
-                    "uniform vec4 vColor;" +
-                    "void main() {" +
-//                    "  gl_FragColor = vColor + vec4(gl_FragCoord.xyz, 0);" +
-//                    "  gl_FragColor = vColor + vec4(gl_FragCoord.x, gl_FragCoord.y, gl_FragCoord.z, 0);" +
-                    "  gl_FragColor = vColor;" +
-                    "}";
+                "#version 300 es\n" +
+                "in vec3 Color;" +
+                "out vec4 FragColor;" +
+                "void main() {" +
+                "  FragColor = vec4(Color, 1.0);" +
+                "}";
 
-    private FloatBuffer vertexBuffer;
+    private FloatBuffer positionBuffer;
+    private FloatBuffer colorBuffer;
+    static float positionData[] = {
+            -0.8f, -0.8f, 0.0f,
+            0.8f, -0.8f, 0.0f,
+            0.0f, 0.8f, 0.0f };
+    static final int positionDataValuesPerVertex = 3;
 
-    // number of coordinates per vertex in this array
-    static final int COORDS_PER_VERTEX = 3;
-    static float triangleCoords[] = {   // in counterclockwise order:
-            0.0f,  0.622008459f, 0.0f, // top
-            -0.5f, -0.311004243f, 0.0f, // bottom left
-            0.5f, -0.311004243f, 0.0f  // bottom right
-    };
+    static float colorData[] = {
+            1.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 1.0f };
+    static final int colorDataValuesPerVertex = 3;
+    private final int vertexCount = positionData.length / positionDataValuesPerVertex;
 
-    // Set color with red, green, blue and alpha (opacity) values
-    float color[] = { 0.63671875f, 0.76953125f, 0.22265625f, 1.0f };
-
-    public Demo2Triangle() {
-        // initialize vertex byte buffer for shape coordinates
+    FloatBuffer initializeFloatBuffer(float data[]) {
         ByteBuffer bb = ByteBuffer.allocateDirect(
-                // (number of coordinate values * 4 bytes per float)
-                triangleCoords.length * 4);
+                data.length * Float.SIZE/8);
         // use the device hardware's native byte order
         bb.order(ByteOrder.nativeOrder());
 
         // create a floating point buffer from the ByteBuffer
-        vertexBuffer = bb.asFloatBuffer();
+        FloatBuffer fb = bb.asFloatBuffer();
         // add the coordinates to the FloatBuffer
-        vertexBuffer.put(triangleCoords);
+        fb.put(data);
         // set the buffer to read the first coordinate
-        vertexBuffer.position(0);
+        fb.position(0);
 
-        int vertexShader = Demo2Renderer.loadShader(GLES20.GL_VERTEX_SHADER,
+        return fb;
+    }
+
+    public Demo2Triangle() {
+        positionBuffer = initializeFloatBuffer(positionData);
+        colorBuffer = initializeFloatBuffer(colorData);
+
+        int vertexShader = Demo2Renderer.loadShader(GLES31.GL_VERTEX_SHADER,
                 vertexShaderCode);
-        int fragmentShader = Demo2Renderer.loadShader(GLES20.GL_FRAGMENT_SHADER,
+        int fragmentShader = Demo2Renderer.loadShader(GLES31.GL_FRAGMENT_SHADER,
                 fragmentShaderCode);
 
         // create empty OpenGL ES Program
-        mProgram = GLES20.glCreateProgram();
+        mProgram = GLES31.glCreateProgram();
 
         // add the vertex shader to program
-        GLES20.glAttachShader(mProgram, vertexShader);
+        GLES31.glAttachShader(mProgram, vertexShader);
 
         // add the fragment shader to program
-        GLES20.glAttachShader(mProgram, fragmentShader);
+        GLES31.glAttachShader(mProgram, fragmentShader);
 
         // creates OpenGL ES program executables
-        GLES20.glLinkProgram(mProgram);
-
+        GLES31.glLinkProgram(mProgram);
     }
 
-    private int mPositionHandle;
-    private int mColorHandle;
+    int setFloatVertexAttributes(String attrName, int valuesPerVertex, boolean needNormalization, Buffer ptr) {
+        int stride = valuesPerVertex* Float.SIZE/8;
+        // get handle to vertex shader's vPosition member
+        int array_id = GLES31.glGetAttribLocation(mProgram, attrName);
 
-    private final int vertexCount = triangleCoords.length / COORDS_PER_VERTEX;
-    private final int vertexStride = COORDS_PER_VERTEX * 4; // 4 bytes per vertex
+        // Enable a handle to the triangle vertices
+        GLES31.glEnableVertexAttribArray(array_id);
+
+        // Prepare the triangle coordinate data
+        GLES31.glVertexAttribPointer(array_id, valuesPerVertex,
+                GLES31.GL_FLOAT, needNormalization,
+                stride, ptr);
+
+        return array_id;
+    }
 
     public void draw() {
         // Add program to OpenGL ES environment
-        GLES20.glUseProgram(mProgram);
+        GLES31.glUseProgram(mProgram);
+        int array_ids[] = {
+                setFloatVertexAttributes("VertexPosition", positionDataValuesPerVertex, false, positionBuffer),
+                setFloatVertexAttributes("VertexColor", colorDataValuesPerVertex, false, colorBuffer)
+        };
 
-        // get handle to vertex shader's vPosition member
-        mPositionHandle = GLES20.glGetAttribLocation(mProgram, "vPosition");
-
-        // Enable a handle to the triangle vertices
-        GLES20.glEnableVertexAttribArray(mPositionHandle);
-
-        // Prepare the triangle coordinate data
-        GLES20.glVertexAttribPointer(mPositionHandle, COORDS_PER_VERTEX,
-                GLES20.GL_FLOAT, false,
-                vertexStride, vertexBuffer);
-
-        // get handle to fragment shader's vColor member
-        mColorHandle = GLES20.glGetUniformLocation(mProgram, "vColor");
-/*
-        the returned value can be evaluated with nrAttributes(0)
-        IntBuffer nrAttributes = IntBuffer.allocate(10);
-        GLES20.glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, nrAttributes);
-*/
-        // Set color for drawing the triangle
-        GLES20.glUniform4fv(mColorHandle, 1, color, 0);
-
-        // Draw the triangle
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, vertexCount);
+        // arrays must be enabled when this command executes (see 2.8.3 Drawing Commands of glspec33.core.pdf)
+        GLES31.glDrawArrays(GLES31.GL_TRIANGLES, 0, vertexCount);
 
         // Disable vertex array
-        GLES20.glDisableVertexAttribArray(mPositionHandle);
+        for (int i =0; i < array_ids.length; i++) {
+            GLES31.glDisableVertexAttribArray(array_ids[i]);
+        }
     }
 }
