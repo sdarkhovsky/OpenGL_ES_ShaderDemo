@@ -33,6 +33,11 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
+    public void StartDemo3(View view) {
+        Intent intent = new Intent(this, Demo3Activity.class);
+        startActivity(intent);
+    }
+
     /**
      * A native method that is implemented by the 'native-lib' native library,
      * which is packaged with this application.
